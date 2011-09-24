@@ -1,0 +1,6 @@
+.project
+*.rbc
+*~
+.rbx
+*.conf
+*.gem
