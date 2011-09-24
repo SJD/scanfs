@@ -8,31 +8,29 @@ module ScanFS
   class Worker
     include ScanFS::Log
 
-    OFFLOAD_THRESHOLD = 1024
+    DEFAULT_TIMEOUT = 1
+    DEFAULT_OFFLOAD_THRESHOLD = 1024
 
     def initialize(master, fs_device, opts={})
+      @timeout = DEFAULT_TIMEOUT
+      @running = false
+
       @master = master
+      @name = @master.next_worker_name # blocking
       @fs_device = fs_device
       @opts = opts
-
-      @timeout = 1
-      @running = false
-      #TODO: remove Worker class knowledge of master internals
-      @name = @master.next_worker_name # blocking
 
       # thread local - no locks
       Thread.current[:inode_cache] = {}
       Thread.current[:inode_cache].default = {}
-      Thread.current[:pending_scans] = []
+      Thread.current[:pending_targets] = []
       Thread.current[:pending_results] = {}
 
       # accounting
-      @scans_dispatched = 0
-      @scans_completed = 0
+      @targets_dispatched = 0
+      @targets_completed = 0
       @stat_ops = 0
       @bytes_seen = 0
-
-      self
     end
 
     def running?
@@ -52,8 +50,8 @@ module ScanFS
     end; private :stop_running
 
     def summarise_workload
-      summary = "#{@name} workload: dispatched(#{@scans_dispatched})"+
-      " completed(#{@scans_completed})"+
+      summary = "#{@name} workload: dispatched(#{@targets_dispatched})"+
+      " completed(#{@targets_completed})"+
       " stat_ops(#{@stat_ops})"+
       " stat_ops_sec(#{@stat_ops/ (@stopped_at - @started_at)})"+
       " bytes_seen(#{@bytes_seen})"
@@ -69,15 +67,15 @@ module ScanFS
       end
     end
 
-    def deliver_pending_scans
-      unless Thread.current[:pending_scans].empty?
+    def deliver_pending_targets
+      unless Thread.current[:pending_targets].empty?
         log.debug {
-          "#{@name} delivering #{Thread.current[:pending_scans].count} scans"
+          "#{@name} delivering #{Thread.current[:pending_targets].size} targets"
         }
-        @master.push_scans(*Thread.current[:pending_scans]) # blocking
-        Thread.current[:pending_scans] = []
+        @master.push_targets(*Thread.current[:pending_targets]) # blocking
+        Thread.current[:pending_targets] = []
       end
-    end; private :deliver_pending_scans
+    end; private :deliver_pending_targets
 
     def is_same_filesystem?(stat)
       if stat.dev != @fs_device
@@ -102,12 +100,12 @@ module ScanFS
     end
 
     def handle_worker_flag
-      case @scan
+      case @target
         when ScanFS::WorkerStopFlag then
           stop_running
-          @scan = nil
+          @target = nil
         else
-          log.debug { "#{@name} encountered unknown flag: #{@scan.class}" }
+          log.debug { "#{@name} encountered unknown flag: #{@target.class}" }
       end
     end; private :handle_worker_flag
 
@@ -115,30 +113,28 @@ module ScanFS
       @master.report_idle
     end; private :report_idle
 
-    def get_scan
+    def get_target
       begin    
-        @scan = @master.pop_scan @timeout
-        if @scan.kind_of? ScanFS::WorkerFlag
+        @target = @master.pop_target @timeout
+        if @target.kind_of? ScanFS::WorkerFlag
           handle_worker_flag
         end
       rescue ThreadError => e
         log.warn { "#{@name} ThreadError: #{e.message}" }
-        @scan = nil
+        @target = nil
       end
-    end; private :get_scan
+    end; private :get_target
 
     def do_scan
-      unless @scan
+      unless @target
         @scan_started = nil
       else
-        log.debug { "#{@name} scanning #{@scan.path}" }
-        @scans_dispatched += 1
+        log.debug { "#{@name} scanning #{@target.path}" }
+        @targets_dispatched += 1
         @scan_started = Time.now.to_f
         begin
-          aggregate = ScanFS::Utils::Aggregate.new @scan.path
-          aggregate << @scan
           child_count = 0
-          aggregate.each_child_path { |path|
+          @target.each_child_path { |path|
             begin
               stat = ScanFS::Utils::Stat.new path
               @stat_ops += 1
@@ -154,33 +150,36 @@ module ScanFS
               next
             end
             if stat.directory?
-              Thread.current[:pending_scans].push stat
+              Thread.current[:pending_targets].push(
+                ScanFS::Utils::Directory.new(stat)
+              )
               @bytes_seen += stat.size
               child_count+= 1
-              if child_count >= OFFLOAD_THRESHOLD
+              if child_count >= DEFAULT_OFFLOAD_THRESHOLD
                 log.debug { "#{@name} preemptive offload" }
-                deliver_pending_scans
+                deliver_pending_targets
                 child_count = 0
               end
             else
               if is_duplicate_inode?(stat)
                 log.debug { "#{@name} duplicate inode detected: #{stat.path}" }
               else
-                aggregate << stat
+                @target << stat
                 @bytes_seen += stat.size
               end
             end
           }
-          deliver_pending_scans
-          depth = @scan.fs_depth
-          Thread.current[:pending_results][depth] ||= {} # pre-partitioned
-          Thread.current[:pending_results][depth][@scan.path] = aggregate
-          @scans_completed += 1
+          deliver_pending_targets
+          # pre-partitioned
+          Thread.current[:pending_results][@target.depth] ||= {}
+          Thread.current[:pending_results][@target.depth][@target.path] =
+            @target
+          @targets_completed += 1
         rescue ScanFS::Error => e
           log.warn "#{@name} #{e.message}"
         rescue StandardError => e
           log.warn {
-            "#{@name} failed to scan #{@scan.path}:" <<
+            "#{@name} failed to scan #{@target.path}:" <<
             " #{e.message}\n#{e.backtrace.join("\n")}"
           }
           @scan_started = nil
@@ -191,12 +190,12 @@ module ScanFS
     def run
       start_running
       while running?
-        get_scan
+        get_target
         do_scan
       end
       log.debug { "#{@name} exiting normally" }
     ensure
-      deliver_pending_scans
+      deliver_pending_targets
       deliver_pending_results
       summarise_workload
       report_idle

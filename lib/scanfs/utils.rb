@@ -76,7 +76,7 @@ module ScanFS::Utils
   end # class Stat
 
 
-  class Aggregate
+  class Directory
     include ScanFS::Log
 
     META_DIRS = {'.' => true, '..' =>true}
@@ -97,7 +97,6 @@ module ScanFS::Utils
         ScanFS::Log.log.warn { "failed to set filters: #{e.message}" }
     end
 
-    @@default_epoch = Time.at(0)
     @@ref_epoch = Time.new.to_i
     @@age_unit = 86400*7 # seven day blocks
     @@x01_epoch = Time.at(@@ref_epoch - @@age_unit*1)
@@ -111,26 +110,26 @@ module ScanFS::Utils
       @@x01_epoch
     end
 
-    attr_reader   :path, :parent, :children, :total, :owner,
-                  :atime, :mtime, :dir_count, :file_count,
+    attr_reader   :stat, :path, :depth, :parent, :children, :total,
+                  :owner, :atime, :mtime, :dir_count, :file_count,
                   :x01, :x02, :x04, :x12, :x26, :x52,
                   :user_sizes
 
-    def initialize(path)
-      @path = path
-      @parent = nil
-      @children = nil
-      @owner = nil
-      @total = 0
-      @atime = @mtime = @@default_epoch
+    def initialize(stat)
+      raise ScanFS::Error.new("invalid argument: #{stat.inspect}") unless
+        stat.directory?
+      @stat, @path, @depth = stat, stat.path, stat.fs_depth
+      @parent, @children = nil, nil
+      @owner, @total = stat.uid, stat.size
+      @atime, @mtime = stat.atime, stat.mtime
       @x01 = 0
       @x02 = 0
       @x04 = 0
       @x12 = 0
       @x26 = 0
       @x52 = 0
-      @user_sizes = {}
-      @dir_count = 0
+      @user_sizes = {@owner => stat.size}
+      @dir_count = 1
       @file_count = 0
     end
 
@@ -190,13 +189,8 @@ module ScanFS::Utils
       case obj
         when Stat
           @total += obj.size
-          if obj.directory?
-            @dir_count+=1 #unless nil == @owner
-          else
-            @file_count+=1
-            add_user_size(obj.uid, obj.size)
-          end
-          @owner = obj.uid if nil == @owner
+          @file_count+=1
+          add_user_size(obj.uid, obj.size)
           @atime = obj.atime unless atime > obj.atime
           @mtime = obj.mtime unless mtime > obj.mtime
           unless obj.size == 0
@@ -207,7 +201,7 @@ module ScanFS::Utils
             @x26 += obj.size if [obj.atime, obj.mtime].max <= @@x26_epoch
             @x52 += obj.size if [obj.atime, obj.mtime].max <= @@x52_epoch
           end
-        when Aggregate
+        when Directory
           @total += obj.total
           @dir_count += obj.dir_count
           @file_count += obj.file_count
@@ -224,7 +218,7 @@ module ScanFS::Utils
           end
         else
           raise TypeError.new(
-            "#{obj.class.name}#<< expects ScanFS::Stat or ScanFS::Aggregate"
+            "#{self.class.name}#<< expects ScanFS::Utils::Stat or #{self.class.name}, not: #{obj.class.name} #{obj.path}"
           )
       end
 
@@ -261,7 +255,7 @@ module ScanFS::Utils
       ">"
     end
 
-  end # class Aggregate
+  end # class Directory
 
 
   class UIDResolver

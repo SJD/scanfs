@@ -85,7 +85,7 @@ module ScanFS
       end
 
       @opts = opts
-      @target = prepare_target(target)
+      prepare_target(target)
 
     rescue ScanFS::Error => e
       raise ScanFS::Error.new("scanner bootstrap failed: #{e.message}")
@@ -239,7 +239,7 @@ module ScanFS
         log.info { "stopping workers" }
         flags = []
         @workers.size.times { flags.push ScanFS::WorkerStopFlag.new }
-        push_scans(*flags)
+        push_targets(*flags)
       }
       @scanner_lock.synchronize {
         @workers.each { |w|
@@ -253,9 +253,9 @@ module ScanFS
       }
     end; private :stop_workers
 
-    def push_scans(*scans)
+    def push_targets(*targets)
       @scan_queue.synchronize {
-        @scan_queue.push(*scans)
+        @scan_queue.push(*targets)
         @scan_queue_populated.broadcast
       }
     end
@@ -264,20 +264,20 @@ module ScanFS
       @scan_queue.synchronize { @jobs_dispatched[Thread.current] = IDLE }
     end
 
-    def pop_scan(timeout=nil)
+    def pop_target(timeout=nil)
       @scan_queue.synchronize {
         if @scan_queue.empty?
           @jobs_dispatched[Thread.current] = IDLE
           @scan_queue_populated.wait timeout
         end
-        next_scan = @scan_queue.pop
-        @jobs_dispatched[Thread.current] = case next_scan
+        next_target = @scan_queue.pop
+        @jobs_dispatched[Thread.current] = case next_target
           when nil then IDLE
           when ScanFS::WorkerFlag then FLAG
           else
             SCAN
         end
-        next_scan
+        next_target
       }
     end
 
@@ -346,8 +346,8 @@ module ScanFS
           log.debug { "merging result fragment, depths: #{result.keys.size}" }
           result.each_pair { |depth, scans|
             @results[depth] ||= {}
-            scans.each_pair { |path, stat|
-              @results[depth][path] = stat
+            scans.each_pair { |path, directory|
+              @results[depth][path] = directory
               num_results+=1
             }
           }
@@ -380,14 +380,14 @@ module ScanFS
           log.debug {
             "aggregating: depth(#{depth}) breadth(#{@results[depth].size})"
           }
-          @results[depth].each_pair { |path, aggregate|
-            aggregate.link_parent(
-              @results[parent_depth][aggregate.parent_path]
+          @results[depth].each_pair { |path, directory|
+            directory.link_parent(
+              @results[parent_depth][directory.parent_path]
             )
             begin
-              aggregate.parent << aggregate
+              directory.parent << directory
             rescue NoMethodError
-              log.error { "orphaned aggregate: #{aggregate.path}" }
+              log.error { "orphaned directory: #{directory.path}" }
               next
             end
           }
@@ -409,7 +409,7 @@ module ScanFS
       return nil unless scan_initiated
 
       reset
-      push_scans @target_stat
+      push_targets ScanFS::Utils::Directory.new(@target_stat)
       @time_started = Time.now
       log.info { "scanning #{@target} started at #{@time_started}" }
 
