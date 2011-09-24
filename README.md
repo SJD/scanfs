@@ -98,3 +98,7 @@ known issues
 
 - I don't really have any tests
 
+todo
+----
+
+- Document plugins' expected usage of the ScanResult class
