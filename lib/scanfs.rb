@@ -4,7 +4,7 @@ module ScanFS
 
   VERSION_MAJOR = 0
   VERSION_MINOR = 0
-  VERSION_POINT = 6
+  VERSION_POINT = 7
 
   def self.version
     "%d.%d.%d" % [
