@@ -1,7 +1,7 @@
 scanfs
 ======
 
-A ruby filesystem scanner that utilises threading to minimize IO wait. By design it will not cross filesystem boundaries. An in memory representation of the filesystem is built focused on directories, aggregating size, the number of files and directories, user sizes, max atime, and max mtime of everything below them. The raw stat structs for each directory are also kept.
+A ruby filesystem scanner that utilises threading to minimize IO wait. By design it will not cross filesystem boundaries. An in memory representation of the filesystem is built focused on directories, aggregating size, the number of files and directories, user sizes, max atime, and max mtime of everything below them.
 
 A simple plugin framework allows the resultant structure to be handed to one or more processing classes post scan to do with what they will. You could store it, statistically analyse it, determine trends, graph it, whatever. This tool combined with some custom plugins can be very useful for reporting on, and managing, online and offline storage.
 

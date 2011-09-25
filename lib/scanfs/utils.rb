@@ -110,7 +110,7 @@ module ScanFS::Utils
       @@x01_epoch
     end
 
-    attr_reader   :stat, :path, :depth, :parent, :children, :total,
+    attr_reader   :path, :depth, :parent, :children, :total,
                   :owner, :atime, :mtime, :dir_count, :file_count,
                   :x01, :x02, :x04, :x12, :x26, :x52,
                   :user_sizes
@@ -118,7 +118,7 @@ module ScanFS::Utils
     def initialize(stat)
       raise ScanFS::Error.new("invalid argument: #{stat.inspect}") unless
         stat.directory?
-      @stat, @path, @depth = stat, stat.path, stat.fs_depth
+      @path, @depth = stat.path, stat.fs_depth
       @parent, @children = nil, nil
       @owner, @total = stat.uid, stat.size
       @atime, @mtime = stat.atime, stat.mtime
