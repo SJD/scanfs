@@ -157,7 +157,7 @@ module ScanFS
     end
 
     if @@options[:filter]
-      ScanFS::Utils::Aggregate.set_filters(*@@options[:filter])
+      ScanFS::Utils::Directory.set_filters(*@@options[:filter])
       ScanFS::Log.log.info {
         "active filters: #{@@options[:filter].join(', ')}"
       }
