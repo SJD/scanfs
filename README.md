@@ -91,7 +91,7 @@ An example plugin;
 
     end # class FilesystemFu
 
-The scanfs executable has a notion of a plugins directory. Dy default it will assume $HOME/.scanfs/plugins to be that location. You can change this with a command line option. It will attempt to load any .rb files it encounters there, and registers any plugins within those files. You could have as many plugins in one file as you want. When invoking a plugin from the command line, you would use class name; in the example plugin above this is FilesystemFu.
+The scanfs executable has a notion of a plugins directory. By default it will assume $HOME/.scanfs/plugins to be that location. You can change this with a command line option. It will attempt to load any .rb files it encounters there, and registers any plugins within those files. You could have as many plugins in one file as you want. When invoking a plugin from the command line, you would use class name; in the example plugin above this is FilesystemFu.
 
 known issues
 ------------
