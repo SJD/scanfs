@@ -70,7 +70,7 @@ module ScanFS::Utils
     def symlink?; @stat.symlink?; end
 
     def fs_depth
-      @path.scan(@@depth_regex).size
+      @path == '/' && 0 || @path.scan(@@depth_regex).size
     end
 
   end # class Stat
