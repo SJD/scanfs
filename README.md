@@ -97,6 +97,8 @@ known issues
 ------------
 
 - I don't really have any tests
+- File system depth determination is brittle
+- Never tested as a library as opposed to an executable 
 
 todo
 ----
