@@ -195,6 +195,7 @@ module ScanFS
       end
       log.debug { "#{@name} exiting normally" }
     ensure
+      stop_running if running?
       deliver_pending_targets
       deliver_pending_results
       summarise_workload
