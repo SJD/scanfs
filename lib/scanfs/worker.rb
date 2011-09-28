@@ -110,7 +110,7 @@ module ScanFS
     end; private :handle_worker_flag
 
     def report_idle
-      @master.report_idle
+      @master.report_idle # blocking
     end; private :report_idle
 
     def get_target
@@ -118,6 +118,8 @@ module ScanFS
         @target = @master.pop_target @timeout
         if @target.kind_of? ScanFS::WorkerFlag
           handle_worker_flag
+        elsif @target
+          @targets_dispatched += 1
         end
       rescue ThreadError => e
         log.warn { "#{@name} ThreadError: #{e.message}" }
@@ -126,65 +128,57 @@ module ScanFS
     end; private :get_target
 
     def do_scan
-      unless @target
-        @scan_started = nil
-      else
-        log.debug { "#{@name} scanning #{@target.path}" }
-        @targets_dispatched += 1
-        @scan_started = Time.now.to_f
+      return unless @target
+      log.debug { "#{@name} scanning #{@target.path}" }
+      child_count = 0
+      @target.each_child_path { |path|
         begin
-          child_count = 0
-          @target.each_child_path { |path|
-            begin
-              stat = ScanFS::Utils::Stat.new path
-              @stat_ops += 1
-            rescue ScanFS::Error => e
-              log.warn "#{@name} #{e.message}"
-              next
-            end
-            unless is_same_filesystem?(stat)
-              log.info {
-                "cross filesystem node detected: expected(#{@fs_device})"+
-                " actual(#{stat.dev}) path(#{stat.path})"
-              }
-              next
-            end
-            if stat.directory?
-              Thread.current[:pending_targets].push(
-                ScanFS::Utils::Directory.new(stat)
-              )
-              @bytes_seen += stat.size
-              child_count+= 1
-              if child_count >= DEFAULT_OFFLOAD_THRESHOLD
-                log.debug { "#{@name} preemptive offload" }
-                deliver_pending_targets
-                child_count = 0
-              end
-            else
-              if is_duplicate_inode?(stat)
-                log.debug { "#{@name} duplicate inode detected: #{stat.path}" }
-              else
-                @target << stat
-                @bytes_seen += stat.size
-              end
-            end
-          }
-          deliver_pending_targets
-          # pre-partitioned
-          Thread.current[:pending_results][@target.depth] ||= {}
-          Thread.current[:pending_results][@target.depth][@target.path] =
-            @target
-          @targets_completed += 1
+          stat = ScanFS::Utils::Stat.new path
+          @stat_ops += 1
         rescue ScanFS::Error => e
           log.warn "#{@name} #{e.message}"
-        rescue StandardError => e
-          log.warn {
-            "#{@name} failed to scan #{@target.path}:" <<
-            " #{e.message}\n#{e.backtrace.join("\n")}"
-          }
-          @scan_started = nil
+          next
         end
-      end
+        unless is_same_filesystem?(stat)
+          log.info {
+            "cross filesystem node detected: expected(#{@fs_device})"+
+            " actual(#{stat.dev}) path(#{stat.path})"
+          }
+          next
+        end
+        if stat.directory?
+          Thread.current[:pending_targets].push(
+            ScanFS::Utils::Directory.new(stat)
+          )
+          @bytes_seen += stat.size
+          child_count+= 1
+          if child_count >= DEFAULT_OFFLOAD_THRESHOLD
+            log.debug { "#{@name} preemptive offload" }
+            deliver_pending_targets
+            child_count = 0
+          end
+        else
+          if is_duplicate_inode?(stat)
+            log.debug { "#{@name} duplicate inode detected: #{stat.path}" }
+          else
+            @target << stat
+            @bytes_seen += stat.size
+          end
+        end
+      }
+      deliver_pending_targets
+      # pre-partitioned
+      Thread.current[:pending_results][@target.depth] ||= {}
+      Thread.current[:pending_results][@target.depth][@target.path] = @target
+      @targets_completed += 1
+
+    rescue ScanFS::Error => e
+      log.warn "#{@name} #{e.message}"
+    rescue StandardError => e
+      log.warn {
+        "#{@name} failed to scan #{@target.path}:" <<
+        " #{e.message}\n#{e.backtrace.join("\n")}"
+      }
     end; private :do_scan
 
     def run
