@@ -122,12 +122,12 @@ module ScanFS::Utils
       @parent, @children = nil, nil
       @owner, @total = stat.uid, stat.size
       @atime, @mtime = stat.atime, stat.mtime
-      @x01 = 0
-      @x02 = 0
-      @x04 = 0
-      @x12 = 0
-      @x26 = 0
-      @x52 = 0
+      @x01 = ([stat.atime, stat.mtime].max <= @@x01_epoch)? stat.size : 0
+      @x02 = ([stat.atime, stat.mtime].max <= @@x02_epoch)? stat.size : 0
+      @x04 = ([stat.atime, stat.mtime].max <= @@x04_epoch)? stat.size : 0
+      @x12 = ([stat.atime, stat.mtime].max <= @@x12_epoch)? stat.size : 0
+      @x26 = ([stat.atime, stat.mtime].max <= @@x26_epoch)? stat.size : 0
+      @x52 = ([stat.atime, stat.mtime].max <= @@x52_epoch)? stat.size : 0
       @user_sizes = {@owner => stat.size}
       @dir_count = 1
       @file_count = 0
