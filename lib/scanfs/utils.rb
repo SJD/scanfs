@@ -2,6 +2,7 @@
 
 require 'etc'
 require 'thread'
+require 'singleton'
 
 module ScanFS::Utils
 
@@ -259,24 +260,26 @@ module ScanFS::Utils
 
 
   class UIDResolver
-    include ScanFS::Log
+    include Singleton
 
-    @@uid_cache ||= {}
-    #TODO: should really have a non-blocking read lock
-    @@uid_cache_lock = Mutex.new
+    def initialize
+      @uid_cache ||= {}
+      #TODO: should really have a non-blocking read lock
+      @uid_cache_lock = Mutex.new
+    end
 
-    def self.resolve(uid)
-      @@uid_cache_lock.synchronize {
+    def resolve(uid)
+      @uid_cache_lock.synchronize {
         begin
-          if nil == @@uid_cache[uid]
-            @@uid_cache[uid] = Etc.getpwuid(uid).name
+          if nil == @uid_cache[uid]
+            @uid_cache[uid] = Etc.getpwuid(uid).name
           end
-          @@uid_cache[uid]
+          @uid_cache[uid]
         rescue ArgumentError
-          log.debug {
-            "#{self.class} failed to resolve username for uid: #{uid}"
+          ScanFS::Log.log.debug {
+            "#{self.class.name} failed to resolve username for uid: #{uid}"
           }
-          @@uid_cache[uid] = uid
+          @uid_cache[uid] = uid
         end
       }
     end
@@ -299,7 +302,7 @@ module ScanFS::Utils
       else
         log.debug { "building basic report: #{@result.root.inspect}" }
         out = ["Scanned #{@result.root.path} in #{@result.scan_time} seconds"]
-        out << "    Owner: #{UIDResolver.resolve(@result.root.owner)}"
+        out << "    Owner: #{UIDResolver.instance.resolve(@result.root.owner)}"
         out << "    Total Size: #{@result.root.total}"
         out << "    Dir Count: #{@result.root.dir_count}"
         out << "    File Count: #{@result.root.file_count}"
@@ -320,7 +323,7 @@ module ScanFS::Utils
           @result.root.user_sizes.to_a.sort {
             |a,b| a[1] <=> b[1]  # ordered by size
           }.reverse.each { |u|   # ... descending
-            out << "        - #{UIDResolver.resolve(u[0])} => #{u[1]}"
+            out << "        - #{UIDResolver.instance.resolve(u[0])} => #{u[1]}"
           }
         end
         log.unknown { out.join("\n") } unless @opts[:logfile].nil?
