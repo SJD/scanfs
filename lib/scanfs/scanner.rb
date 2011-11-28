@@ -54,8 +54,7 @@ module ScanFS
       @workers = []
       @worker_next_id = 1
 
-      @inode_cache = {}.extend(MonitorMixin)
-      @inode_cache.default = {}
+      @inode_cache = Hash.new { |h,k| h[k] = {} }.extend(MonitorMixin)
       @inode_cache_merge = Proc.new { |d, c1, c2| c1.merge!(c2) }
       #@inode_cache_lock = Mutex.new
 

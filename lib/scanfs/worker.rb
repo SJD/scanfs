@@ -21,8 +21,7 @@ module ScanFS
       @opts = opts
 
       # thread local - no locks
-      Thread.current[:inode_cache] = {}
-      Thread.current[:inode_cache].default = {}
+      Thread.current[:inode_cache] = Hash.new { |h,k| h[k] = {} }
       Thread.current[:pending_targets] = []
       Thread.current[:pending_results] = {}
 
