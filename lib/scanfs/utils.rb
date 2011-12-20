@@ -80,8 +80,8 @@ module ScanFS::Utils
   class Directory
     include ScanFS::Log
 
-    #@@ruby_engine = ScanFS::Constants::ENGINE
-    #@@separator_regex = Regexp.new(/(?<![\\\/])\//)
+    @@ruby_engine = ScanFS::Constants::ENGINE
+    @@separator_regex = Regexp.new(/(?<![\\\/])\//)
 
     META_DIRS = {'.' => true, '..' =>true}
     @@filters = META_DIRS.dup
@@ -152,9 +152,16 @@ module ScanFS::Utils
     def parent_path
       if @parent
         @parent.path
-      #elsif 'jruby' == @@ruby_engine # jruby munges paths with \\ in them
-      #  pp = @path.rpartition(@@separator_regex)[0]
-      #  ("" == pp)? '/' : pp
+      elsif 'jruby' == @@ruby_engine # jruby munges paths with \\ in them
+        pp = @path.rpartition(@@separator_regex)[0]
+        ("" == pp)? '/' : pp
+      #elsif 'jruby' == @@ruby_engine
+      #  begin
+      #    pp = @path[0, @path.rindex(@@separator_regex)]
+      #    ("" == pp)? '/' : pp
+      #  rescue
+      #    '/'
+      #  end
       else
         File.dirname(@path)
       end
@@ -164,7 +171,12 @@ module ScanFS::Utils
       begin
         Dir.foreach(@path) { |dirent|
           next if @@filters[dirent]
-          yield @path.dup << File::SEPARATOR << dirent
+          if 'jruby' == @@ruby_engine # jruby munges paths with \\ in them
+            yield '/' == @path && @path.dup << dirent || \
+              @path.dup << File::SEPARATOR << dirent
+          else
+            yield File.join(@path, dirent)
+          end
         }
       rescue Errno::EACCES
         raise ScanFS::PermissionError.new(
