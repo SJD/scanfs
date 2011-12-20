@@ -380,13 +380,15 @@ module ScanFS
             "aggregating: depth(#{depth}) breadth(#{@results[depth].size})"
           }
           @results[depth].each_pair { |path, directory|
-            directory.link_parent(
-              @results[parent_depth][directory.parent_path]
-            )
             begin
+              directory.link_parent(
+                @results[parent_depth][directory.parent_path]
+              )
               directory.parent << directory
             rescue NoMethodError
-              log.error { "orphaned directory: #{directory.path}" }
+              log.error {
+                "orphaned: #{directory.path}, parent: #{directory.parent_path}"
+              }
               next
             end
           }

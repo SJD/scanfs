@@ -80,6 +80,9 @@ module ScanFS::Utils
   class Directory
     include ScanFS::Log
 
+    #@@ruby_engine = ScanFS::Constants::ENGINE
+    #@@separator_regex = Regexp.new(/(?<![\\\/])\//)
+
     META_DIRS = {'.' => true, '..' =>true}
     @@filters = META_DIRS.dup
 
@@ -123,12 +126,12 @@ module ScanFS::Utils
       @parent, @children = nil, nil
       @owner, @total = stat.uid, stat.size
       @atime, @mtime = stat.atime, stat.mtime
-      @x01 = (stat.mtime <= @@x01_epoch)? stat.size : 0
-      @x02 = (stat.mtime <= @@x02_epoch)? stat.size : 0
-      @x04 = (stat.mtime <= @@x04_epoch)? stat.size : 0
-      @x12 = (stat.mtime <= @@x12_epoch)? stat.size : 0
-      @x26 = (stat.mtime <= @@x26_epoch)? stat.size : 0
-      @x52 = (stat.mtime <= @@x52_epoch)? stat.size : 0
+      @x01 = (@mtime <= @@x01_epoch)? @total : 0
+      @x02 = (@mtime <= @@x02_epoch)? @total : 0
+      @x04 = (@mtime <= @@x04_epoch)? @total : 0
+      @x12 = (@mtime <= @@x12_epoch)? @total : 0
+      @x26 = (@mtime <= @@x26_epoch)? @total : 0
+      @x52 = (@mtime <= @@x52_epoch)? @total : 0
       @user_sizes = {@owner => stat.size}
       @dir_count = 1
       @file_count = 0
@@ -149,6 +152,9 @@ module ScanFS::Utils
     def parent_path
       if @parent
         @parent.path
+      #elsif 'jruby' == @@ruby_engine # jruby munges paths with \\ in them
+      #  pp = @path.rpartition(@@separator_regex)[0]
+      #  ("" == pp)? '/' : pp
       else
         File.dirname(@path)
       end
@@ -158,7 +164,7 @@ module ScanFS::Utils
       begin
         Dir.foreach(@path) { |dirent|
           next if @@filters[dirent]
-          yield File.join(@path, dirent)
+          yield @path.dup << File::SEPARATOR << dirent
         }
       rescue Errno::EACCES
         raise ScanFS::PermissionError.new(
@@ -195,12 +201,14 @@ module ScanFS::Utils
           @atime = obj.atime unless atime > obj.atime
           @mtime = obj.mtime unless mtime > obj.mtime
           unless obj.size == 0
-            @x01 += obj.size if [obj.atime, obj.mtime].max <= @@x01_epoch
-            @x02 += obj.size if [obj.atime, obj.mtime].max <= @@x02_epoch
-            @x04 += obj.size if [obj.atime, obj.mtime].max <= @@x04_epoch
-            @x12 += obj.size if [obj.atime, obj.mtime].max <= @@x12_epoch
-            @x26 += obj.size if [obj.atime, obj.mtime].max <= @@x26_epoch
-            @x52 += obj.size if [obj.atime, obj.mtime].max <= @@x52_epoch
+            ref_time = [obj.atime, obj.mtime].max
+            ref_size = obj.size
+            @x01 += ref_size if ref_time <= @@x01_epoch
+            @x02 += ref_size if ref_time <= @@x02_epoch
+            @x04 += ref_size if ref_time <= @@x04_epoch
+            @x12 += ref_size if ref_time <= @@x12_epoch
+            @x26 += ref_size if ref_time <= @@x26_epoch
+            @x52 += ref_size if ref_time <= @@x52_epoch
           end
         when Directory
           @total += obj.total
