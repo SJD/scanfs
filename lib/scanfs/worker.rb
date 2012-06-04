@@ -20,6 +20,16 @@ module ScanFS
       @fs_device = fs_device
       @opts = opts
 
+      if @opts[:clamp_times]
+        @clamp_times = true
+        # atimes and mtimes outside these values will be clamped
+        @clamp_min = @opts.fetch(:clamp_min, 0).to_i
+        @clamp_max = @opts.fetch(:clamp_max, Time.now).to_i +
+          ScanFS::Constants::CLAMP_MAX_LEEWAY
+      else
+        @clamp_times = false
+      end
+
       # thread local - no locks
       Thread.current[:inode_cache] = Hash.new { |h,k| h[k] = {} }
       Thread.current[:pending_targets] = []
@@ -113,7 +123,7 @@ module ScanFS
     end; private :report_idle
 
     def get_target
-      begin    
+      begin
         @target = @master.pop_target @timeout
         if @target.kind_of? ScanFS::WorkerFlag
           handle_worker_flag
@@ -126,6 +136,59 @@ module ScanFS
       end
     end; private :get_target
 
+    def clamp_times(stat)
+      if @clamp_times
+        new_mtime, new_atime = nil, nil
+        mtime, atime = stat.mtime.to_i, stat.atime.to_i
+
+        if mtime > @clamp_max
+          new_mtime = @clamp_max
+          log.debug {
+            "#{@name} clamping high mtime (#{stat.mtime}): #{stat.path}"
+          }
+        elsif mtime < @clamp_min
+          new_mtime = @clamp_min
+          log.debug {
+            "#{@name} clamping low mtime (#{stat.mtime}): #{stat.path}"
+          }
+        end
+
+        if atime > @clamp_max
+          new_atime = @clamp_max
+          log.debug {
+            "#{@name} clamping high atime (#{stat.atime}): #{stat.path}"
+          }
+        elsif atime < @clamp_min
+          new_atime = @clamp_min
+          log.debug {
+            "#{@name} clamping low atime (#{stat.atime}): #{stat.path}"
+          }
+        end
+
+        if new_atime || new_mtime
+          new_mtime ||= stat.mtime
+          new_atime ||= stat.atime
+          log.warn {
+            "#{@name} setting times on '#{stat.path}': " <<
+            "atime(#{stat.atime} -> #{Time.at(new_atime)}) " <<
+            "mtime(#{stat.mtime} -> #{Time.at(new_mtime)})"
+          }
+          begin
+            File.utime(new_atime, new_mtime, stat.path)
+          rescue => err
+            message = "#{@name} failed to adjust file times on: #{stat.path}: #{err.message}"
+            log.warn { message }
+            raise ScanFS::Error.new( message )
+          end
+        else
+          false
+        end
+
+      else
+        false
+      end
+    end
+
     def do_scan
       return unless @target
       log.debug { "#{@name} scanning #{@target.path}" }
@@ -134,6 +197,10 @@ module ScanFS
         begin
           stat = ScanFS::Utils::Stat.new path
           @stat_ops += 1
+          if clamp_times(stat)
+            stat = ScanFS::Utils::Stat.new path
+            @stat_ops += 1
+          end
         rescue ScanFS::Error => e
           log.warn "#{@name} #{e.message}"
           next

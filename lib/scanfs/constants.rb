@@ -13,5 +13,6 @@ module ScanFS::Constants
     '.scanfs'
   )
 
+  CLAMP_MAX_LEEWAY = 24*60*60
 
 end # module ScanFS::Constants

@@ -27,7 +27,7 @@ module ScanFS::Utils
           # and helps to stop our ref dev no from disagreeing with every
           # single subsequent stat dev in the case where the root wasn't
           # mounted at runtime.
-          # 
+          #
           @stat = File.lstat(File.join(@path, '.'))
         else
           @stat = File.lstat(@path)
@@ -40,7 +40,7 @@ module ScanFS::Utils
         # This hack is here until I figure out why sometimes
         # lstat will return ENOENT and then a successful result
         # on an immediate retry. Kernel bug?
-        # 
+        #
         # On top of that, current JRuby will return ENOENT
         # regardless of errno in a failure condition which makes
         # this hack all the more painful.
@@ -87,7 +87,7 @@ module ScanFS::Utils
     @@filters = META_DIRS.dup
 
     def self.filters
-      @@filters    
+      @@filters
     end
 
     def self.set_filters(*filters)
@@ -146,15 +146,6 @@ module ScanFS::Utils
           end
         end
       end
-
-
-      #@x01 = (@mtime <= @@x01_epoch)? @total : 0
-      #@x02 = (@mtime <= @@x02_epoch)? @total : 0
-      #@x04 = (@mtime <= @@x04_epoch)? @total : 0
-      #@x12 = (@mtime <= @@x12_epoch)? @total : 0
-      #@x26 = (@mtime <= @@x26_epoch)? @total : 0
-      #@x52 = (@mtime <= @@x52_epoch)? @total : 0
-
 
       @user_sizes = {@owner => stat.size}
       @dir_count = 1
@@ -259,12 +250,6 @@ module ScanFS::Utils
               end
             end
 
-            #@x01 += ref_size if ref_time <= @@x01_epoch
-            #@x02 += ref_size if ref_time <= @@x02_epoch
-            #@x04 += ref_size if ref_time <= @@x04_epoch
-            #@x12 += ref_size if ref_time <= @@x12_epoch
-            #@x26 += ref_size if ref_time <= @@x26_epoch
-            #@x52 += ref_size if ref_time <= @@x52_epoch
           end
         when Directory
           @total += obj.total
@@ -298,7 +283,7 @@ module ScanFS::Utils
       # OR
       #
       # b) you are cartwheeling around the filesystem linking NO parents
-      # which you intend to do all of at the end. In this case you should 
+      # which you intend to do all of at the end. In this case you should
       # immediately insert the stat and wait to link parents AFTER you
       # have inserted all the stats. You have chosen MANUAL aggregation.
       #

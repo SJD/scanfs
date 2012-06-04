@@ -16,7 +16,7 @@ module ScanFS
 
   @@ret = 0
   @@progname = File.basename("#{$0}", ".rb")
-  @@options = {}
+  @@options = {:clamp_min => Time.at(0), :clamp_max => Time.now}
   @@target = Dir.pwd
   @@profiling = false
 
@@ -89,6 +89,25 @@ module ScanFS
         @@options[:disable_plugins] = true
       }
 
+      opts.separator("\nOperations")
+      clamp_times_help = "While scanning, adjust any atimes or mtimes that fall
+      outside a specified range. By default this range is unix epoch 0 to the
+      unix epoch for now. These can be adjusted by one or both of --clamp-max
+      and --clamp-min."
+      opts.on( "--clamp-times",  clamp_times_help) {
+        @@options[:clamp_times] = true
+      }
+      max_time_help = "Specify the max file access or modification time as a
+      unix epoch timestamp. Only observed in conjunction with --clamp-times."
+      opts.on( "--clamp-max=INT", Integer, max_time_help ) { |epoch|
+        @@options[:clamp_max] = Time.at(epoch)
+      }
+      min_time_help = "Specify the min file access or modification time as a
+      unix epoch timestamp. Only observed in conjunction with --clamp-times."
+      opts.on( "--clamp-min=INT", Integer, min_time_help ) { |epoch|
+        @@options[:clamp_min] = Time.at(epoch)
+      }
+
       opts.separator("\nProfiling")
       ruby_prof_help = "Apply ruby-prof to scan"
       opts.on( "--ruby-profile", ruby_prof_help ) {
@@ -123,7 +142,7 @@ module ScanFS
     begin
       optparse.parse!(tmp_argv)
     rescue OptionParser::ParseError => e
-      warn "#{e}"; exit 1    
+      warn "#{e}"; exit 1
     end
 
     begin
@@ -163,6 +182,18 @@ module ScanFS
       }
     end
 
+    if @@options[:clamp_times]
+      if @@options[:clamp_min] > @@options[:clamp_max]
+        ScanFS::Log.log.warn { "swapping inverted min/ max for clamp times!" }
+        @@options[:clamp_min], @@options[:clamp_max] =
+          @@options[:clamp_max], @@options[:clamp_min]
+      end
+      ScanFS::Log.log.info {
+        "clamping file times: min(#{@@options[:clamp_min]})" <<
+        " max(#{@@options[:clamp_max]})"
+      }
+    end
+
     if @@options[:list_plugins]
       puts "Known plugins:"
       ScanFS::Plugins.known.each { |plugin_name|
@@ -182,7 +213,7 @@ module ScanFS
       warn "no <target dir> specified, assuming cwd: #{@@target}"
     else
       @@target = tmp_argv.shift
-    end 
+    end
 
   end
 
