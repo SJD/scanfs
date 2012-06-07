@@ -115,7 +115,7 @@ module ScanFS::Utils
     end
 
     attr_reader   :path, :depth, :parent, :children, :total,
-                  :owner, :atime, :mtime, :dir_count, :file_count,
+                  :owner, :mtime, :dir_count, :file_count,
                   :x01, :x02, :x04, :x12, :x26, :x52,
                   :user_sizes
 
@@ -125,7 +125,7 @@ module ScanFS::Utils
       @path, @depth = stat.path, stat.fs_depth
       @parent, @children = nil, nil
       @owner, @total = stat.uid, stat.size
-      @atime, @mtime = stat.atime, stat.mtime
+      @_atime, @mtime = stat.atime, stat.mtime
 
       @x01, @x02, @x04, @x12, @x26, @x52 = 0, 0, 0, 0, 0, 0
       if (@mtime <= @@x01_epoch)
@@ -150,6 +150,10 @@ module ScanFS::Utils
       @user_sizes = {@owner => stat.size}
       @dir_count = 1
       @file_count = 0
+    end
+
+    def atime
+      @atime ||= @_atime
     end
 
     def link_parent(parent)
@@ -225,7 +229,7 @@ module ScanFS::Utils
           @total += obj.size
           @file_count+=1
           add_user_size(obj.uid, obj.size)
-          @atime = obj.atime unless atime > obj.atime
+          @atime = obj.atime if nil == @atime || @atime < obj.atime
           @mtime = obj.mtime unless mtime > obj.mtime
           unless obj.size == 0
             ref_time = [obj.atime, obj.mtime].max
@@ -255,7 +259,7 @@ module ScanFS::Utils
           @total += obj.total
           @dir_count += obj.dir_count
           @file_count += obj.file_count
-          @atime = obj.atime unless atime > obj.atime
+          @atime = obj.atime if nil == @atime || @atime < obj.atime
           @mtime = obj.mtime unless mtime > obj.mtime
           merge_user_sizes(obj.user_sizes)
           unless obj.total == 0

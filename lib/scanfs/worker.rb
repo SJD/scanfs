@@ -245,6 +245,20 @@ module ScanFS
         "#{@name} failed to scan #{@target.path}:" <<
         " #{e.message}\n#{e.backtrace.join("\n")}"
       }
+    ensure
+      if @target && @target.atime && @target.mtime
+        log.debug {
+          "#{@name} running utime on " <<
+          "#{@target.path}: #{@target.atime}/ #{@target.mtime}"
+        }
+        begin
+          File.utime(@target.atime, @target.mtime, @target.path)
+        rescue => err
+          log.warn {
+            "#{@name} failed to run utime on #{@target.path}: #{err.message}"
+          }
+        end
+      end
     end; private :do_scan
 
     def run
