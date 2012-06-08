@@ -31,7 +31,8 @@ module ScanFS
       end
 
       # thread local - no locks
-      Thread.current[:inode_cache] = Hash.new { |h,k| h[k] = {} }
+      #Thread.current[:inode_cache] = Hash.new { |h,k| h[k] = {} }
+      Thread.current[:inode_cache] = nil
       Thread.current[:pending_targets] = []
       Thread.current[:pending_results] = {}
 
@@ -40,6 +41,8 @@ module ScanFS
       @targets_completed = 0
       @stat_ops = 0
       @bytes_seen = 0
+      @inode_cache_hits = 0
+      @inode_cache_misses = 0
     end
 
     def running?
@@ -63,7 +66,9 @@ module ScanFS
       " completed(#{@targets_completed})"+
       " stat_ops(#{@stat_ops})"+
       " stat_ops_sec(#{@stat_ops/ (@stopped_at - @started_at)})"+
-      " bytes_seen(#{@bytes_seen})"
+      " bytes_seen(#{@bytes_seen})"+
+      " inode cache(#{@inode_cache_hits} hits/ #{@inode_cache_misses} misses"+
+      " - #{@inode_cache_hits/(@inode_cache_hits+@inode_cache_misses).to_f*100}%)"
       log.info { summary }
     end
 
@@ -98,15 +103,40 @@ module ScanFS
 
     def is_duplicate_inode?(stat)
       if stat.nlink > 1
-        if Thread.current[:inode_cache][stat.dev][stat.ino]
+        if Thread.current[:inode_cache] && Thread.current[:inode_cache].includes?(stat.ino)
+          log.debug { "#{@name} local cache lookup #{stat.ino}: hit" }
+          @inode_cache_hits += 1
           true
         else
-          @master.is_duplicate_inode? stat # blocking
+          log.debug { "#{@name} local cache lookup #{stat.ino}: miss" }
+          @inode_cache_misses += 1
+          lookup = ScanFS::InodeCache.has_node?(stat.ino)
+          Thread.current[:inode_cache] = ScanFS::InodeCache.clone
+          log.debug {
+            "#{@name} shared cache lookup #{stat.ino}: #{((lookup)?"hit":"miss")}"
+          }
+          lookup
         end
       else
         false
       end
     end
+
+    #def is_duplicate_inode?(stat)
+    #  if stat.nlink > 1
+    #    if Thread.current[:inode_cache][stat.dev][stat.ino]
+    #      log.debug { "#{@name} cache hit" }
+    #      @inode_cache_hits += 1
+    #      true
+    #    else
+    #      log.debug { "#{@name} cache miss" }
+    #      @inode_cache_misses += 1
+    #      @master.is_duplicate_inode? stat # blocking
+    #    end
+    #  else
+    #    false
+    #  end
+    #end
 
     def handle_worker_flag
       case @target

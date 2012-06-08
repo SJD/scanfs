@@ -60,6 +60,7 @@ module ScanFS
 
       @scan_queue = [].extend(MonitorMixin)
       @scan_queue_populated = @scan_queue.new_cond
+      @scan_queue_empty = @scan_queue.new_cond
       # as a general rule never touch this outside of @scan_queue#synchronize
       @jobs_dispatched = {}
       @jobs_dispatched.default = IDLE
@@ -181,7 +182,7 @@ module ScanFS
         @jobs_dispatched.clear
         @result_queue.clear
         @results.clear
-      }    
+      }
     end
 
     def next_worker_name
@@ -243,7 +244,7 @@ module ScanFS
       @scanner_lock.synchronize {
         @workers.each { |w|
           next unless w.alive?
-          joined = w.join(WORKER_TIMEOUT) 
+          joined = w.join(WORKER_TIMEOUT)
           unless joined
             log.warn { "killing unresponsive worker" }
             w.kill rescue ThreadError
@@ -267,6 +268,7 @@ module ScanFS
       @scan_queue.synchronize {
         if @scan_queue.empty?
           @jobs_dispatched[Thread.current] = IDLE
+          @scan_queue_empty.signal
           @scan_queue_populated.wait timeout
         end
         next_target = @scan_queue.pop
@@ -283,7 +285,7 @@ module ScanFS
     def push_results(results)
       @result_queue.synchronize {
         @result_queue.push results
-        @result_queue_populated.broadcast
+        @result_queue_populated.signal
       }
     end
 
@@ -330,6 +332,7 @@ module ScanFS
         if @scan_queue.empty? && [IDLE] == @jobs_dispatched.values.uniq
           true
         else
+          @scan_queue_empty.wait
           false
         end
       }

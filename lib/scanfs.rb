@@ -3,8 +3,8 @@
 module ScanFS
 
   VERSION_MAJOR = 0
-  VERSION_MINOR = 2
-  VERSION_POINT = 0
+  VERSION_MINOR = 3
+  VERSION_POINT = 1
 
   def self.version
     "%d.%d.%d" % [
@@ -16,11 +16,13 @@ module ScanFS
 
 end # module ScanFS
 
+require 'scanfs/ext/bloominsimple'
 require 'scanfs/constants'
 require 'scanfs/base'
 require 'scanfs/log'
 require 'scanfs/nls'
 require 'scanfs/utils'
+require 'scanfs/inode_cache'
 require 'scanfs/worker'
 require 'scanfs/scanner'
 require 'scanfs/plugins'
