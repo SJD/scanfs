@@ -102,7 +102,7 @@ module ScanFS
 
     def is_duplicate_inode?(stat)
       if stat.nlink > 1
-        if Thread.current[:inode_cache] && Thread.current[:inode_cache].includes?(stat.ino)
+        if Thread.current[:inode_cache] && 1 == Thread.current[:inode_cache][stat.ino]
           log.debug { "#{@name} local cache lookup #{stat.ino}: hit" }
           @inode_cache_hits += 1
           true
