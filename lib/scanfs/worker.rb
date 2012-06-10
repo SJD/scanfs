@@ -31,7 +31,6 @@ module ScanFS
       end
 
       # thread local - no locks
-      #Thread.current[:inode_cache] = Hash.new { |h,k| h[k] = {} }
       Thread.current[:inode_cache] = nil
       Thread.current[:pending_targets] = []
       Thread.current[:pending_results] = {}
@@ -121,22 +120,6 @@ module ScanFS
         false
       end
     end
-
-    #def is_duplicate_inode?(stat)
-    #  if stat.nlink > 1
-    #    if Thread.current[:inode_cache][stat.dev][stat.ino]
-    #      log.debug { "#{@name} cache hit" }
-    #      @inode_cache_hits += 1
-    #      true
-    #    else
-    #      log.debug { "#{@name} cache miss" }
-    #      @inode_cache_misses += 1
-    #      @master.is_duplicate_inode? stat # blocking
-    #    end
-    #  else
-    #    false
-    #  end
-    #end
 
     def handle_worker_flag
       case @target

@@ -1,34 +1,33 @@
 # -*- encoding: binary -*-
 
-require 'scanfs/ext/bloominsimple'
-require 'monitor'
+require 'thread'
 
 module ScanFS::InodeCache
 
 
-  @filter ||= BloominSimple.new(1_000_000)
-  @monitor = Monitor.new
+  @filter = []
+  @mutex = Mutex.new
 
   def self.has_node?(node)
-    @monitor.synchronize {
-      if @filter.includes?(node)
+    @mutex.synchronize {
+      if 1 == @filter[node]
         true
       else
-        @filter.add(node)
+        @filter[node] = 1
         false
       end
     }
   end
 
   def self.clone
-    @monitor.synchronize {
+    @mutex.synchronize {
       @filter.clone
     }
   end
 
   def self.reset
-    @monitor.synchronize {
-      @filter = BloominSimple.new(1_000_000)
+    @mutex.synchronize {
+      @filter = []
     }
   end
 

@@ -54,10 +54,6 @@ module ScanFS
       @workers = []
       @worker_next_id = 1
 
-      @inode_cache = Hash.new { |h,k| h[k] = {} }.extend(MonitorMixin)
-      @inode_cache_merge = Proc.new { |d, c1, c2| c1.merge!(c2) }
-      #@inode_cache_lock = Mutex.new
-
       @scan_queue = [].extend(MonitorMixin)
       @scan_queue_populated = @scan_queue.new_cond
       @scan_queue_empty = @scan_queue.new_cond
@@ -177,11 +173,11 @@ module ScanFS
         @workers.each { |w| w.kill if w.alive? }
         @workers.clear
         @worker_next_id = 1
-        @inode_cache.clear
         @scan_queue.clear
         @jobs_dispatched.clear
         @result_queue.clear
         @results.clear
+        ScanFS::InodeCache.reset
       }
     end
 
@@ -205,20 +201,6 @@ module ScanFS
           @target_device = restat.dev
         end
         @target_device
-      }
-    end
-
-    def is_duplicate_inode?(stat)
-      @inode_cache.synchronize {
-        if @inode_cache[stat.dev] && @inode_cache[stat.dev][stat.ino]
-          Thread.current[:inode_cache].merge!(@inode_cache, &@inode_cache_merge)
-          true
-        else
-          @inode_cache[stat.dev] ||= {}
-          @inode_cache[stat.dev][stat.ino] = true
-          Thread.current[:inode_cache].merge!(@inode_cache, &@inode_cache_merge)
-          false
-        end
       }
     end
 
