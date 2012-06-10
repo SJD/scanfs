@@ -16,7 +16,6 @@ module ScanFS
 
 end # module ScanFS
 
-require 'scanfs/ext/bloominsimple'
 require 'scanfs/constants'
 require 'scanfs/base'
 require 'scanfs/log'
