@@ -30,8 +30,6 @@ module ScanFS
         @clamp_times = false
       end
 
-      # thread local - no locks
-      Thread.current[:inode_cache] = nil
       Thread.current[:pending_targets] = []
       Thread.current[:pending_results] = {}
 
@@ -67,7 +65,7 @@ module ScanFS
       " stat_ops_sec(#{@stat_ops/ (@stopped_at - @started_at)})"+
       " bytes_seen(#{@bytes_seen})"+
       " inode cache(#{@inode_cache_hits} hits/ #{@inode_cache_misses} misses"+
-      " - #{@inode_cache_hits/(@inode_cache_hits+@inode_cache_misses).to_f*100}%)"
+      " - #{"%.2f hit rate" % (@inode_cache_hits.to_f/(@inode_cache_hits+@inode_cache_misses)*100)}%)"
       log.info { summary }
     end
 
@@ -102,20 +100,13 @@ module ScanFS
 
     def is_duplicate_inode?(stat)
       if stat.nlink > 1
-        if Thread.current[:inode_cache] && 1 == Thread.current[:inode_cache][stat.ino]
-          log.debug { "#{@name} local cache lookup #{stat.ino}: hit" }
+        seen = ScanFS::InodeCache.has_node?(stat.ino)
+        if seen
           @inode_cache_hits += 1
-          true
         else
-          log.debug { "#{@name} local cache lookup #{stat.ino}: miss" }
           @inode_cache_misses += 1
-          lookup = ScanFS::InodeCache.has_node?(stat.ino)
-          Thread.current[:inode_cache] = ScanFS::InodeCache.clone
-          log.debug {
-            "#{@name} shared cache lookup #{stat.ino}: #{((lookup)?"hit":"miss")}"
-          }
-          lookup
         end
+        log.debug { "#{@name} cache lookup #{stat.ino}: #{((seen)?"hit":"miss")}" }
       else
         false
       end
