@@ -3,10 +3,10 @@
 $:.unshift File.dirname(__FILE__)
 require 'helper'
 
-class TestInodeCache < Test::Unit::TestCase
+class TC_TestInodeCache < Test::Unit::TestCase
 
   def setup
-    ScanFS::InodeCache.reset
+    ScanFS::InodeCache.init
     @test_inode_1 = File.lstat(__FILE__).ino
     @test_inode_2 = File.lstat( File.dirname(__FILE__) ).ino
   end
@@ -34,7 +34,7 @@ class TestInodeCache < Test::Unit::TestCase
 
   def test_collisions
     collisions = 0
-    test_keys = 10_000_000
+    test_keys = 1_000_000
     (1..test_keys).each { |node|
       collisions += 1 if ScanFS::InodeCache.has_node?(node)
     }

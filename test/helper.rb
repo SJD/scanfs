@@ -1,4 +1,5 @@
-require "test/unit"
-require 'pathname'
-$:.unshift Pathname.new(__FILE__).dirname.join('..', 'lib')
+require 'test/unit'
+
+lib_dir = File.join(File.dirname(__FILE__),'..','lib')
+$:.unshift lib_dir unless $:.include?(lib_dir)
 require 'scanfs'
