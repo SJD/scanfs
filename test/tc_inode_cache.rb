@@ -34,7 +34,7 @@ class TC_TestInodeCache < Test::Unit::TestCase
 
   def test_collisions
     collisions = 0
-    test_keys = 1_000_000
+    test_keys = 10_000_000
     (1..test_keys).each { |node|
       collisions += 1 if ScanFS::InodeCache.has_node?(node)
     }
