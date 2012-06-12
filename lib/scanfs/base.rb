@@ -244,7 +244,6 @@ module ScanFS
   def self.run()
 
     ScanFS::start_profiler
-    ScanFS::InodeCache.init
     scanner = ScanFS::Scanner.new(@@target, @@options)
     result = scanner.scan
     ScanFS::stop_profiler
