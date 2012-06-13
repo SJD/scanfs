@@ -17,6 +17,7 @@ Not particularly good when:
 - using a Ruby implementation with poor thread concurrency
 - scanning a filesystem that resides on a single disk
 - you have one core and no memory
+- your filesystems are extremely hard link heavy
 
 Can be very memory intensive depending on your filesystem density and/ or Ruby implementation of choice.
 
@@ -29,9 +30,8 @@ The source is entirely core or stdlib. This won't run on ruby-1.8.x, however fix
 
     export JAVA_OPTS="-server -Xms512m -Xmx4096m"
 
-**rubinius**: last time I checked 1.2.4 ran this fine. You probably want the 2.x series for concurrency however. I have managed to make it work reasonably reliably on _small_ filesystems with the JIT off.
+**rubinius**: last time I checked 1.2.4 ran this fine. You probably want the 2.x series for concurrency however.
 
-    export RBXOPTS="-Xint" 
 
 installation
 ------------
@@ -98,9 +98,10 @@ known issues
 
 - I don't really have any tests
 - File system depth determination is brittle
-- Never tested as a library as opposed to an executable 
+- Never tested as a library as opposed to an executable
 
 todo
 ----
 
 - Document plugins' expected usage of the ScanResult class
+- Create the notion of an inline processing plugin for the workers to complement the current post process plugins

@@ -13,6 +13,7 @@ Particularly good when:
 Not particularly good when:
  - using a Ruby implementation with poor thread concurrency
  - scanning a filesystem that resides on a single disk
+ - the filesystem is extremely hard link heavy
 
 Can be very memory intensive depending on your filesystem density
 and/ or Ruby implementation of choice.
@@ -28,5 +29,5 @@ Gem::Specification.new do |s|
   s.description         = scanfs_description
   s.files               = Dir.glob("{bin,lib}/**/*")
   s.require_paths       = ["lib"]
-  s.executables         = ['scanfs'] 
+  s.executables         = ['scanfs']
 end
