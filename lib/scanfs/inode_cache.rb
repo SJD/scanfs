@@ -23,7 +23,7 @@ module ScanFS::InodeCache
       @salts = ScanFS::Constants::INODE_CACHE_SALTS.sort_by{rand}[0..@num_salts-1]
 
       ScanFS::Log.log.info {
-        "Initialising inode cache: caches(#{@num_caches})"<<
+        "initialising inode cache: caches(#{@num_caches})"<<
         " salts(#{@salts.join(", ")})"
       }
 

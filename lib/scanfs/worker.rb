@@ -20,6 +20,7 @@ module ScanFS
       @fs_device = fs_device
       @opts = opts
 
+      @reset_utimes = @opts.fetch(:reset_utimes, true)
       if @opts[:clamp_times]
         @clamp_times = true
         # atimes and mtimes outside these values will be clamped
@@ -250,7 +251,7 @@ module ScanFS
         " #{e.message}\n#{e.backtrace.join("\n")}"
       }
     ensure
-      if @target && @target.atime && @target.mtime
+      if @reset_utimes && @target && @target.atime && @target.mtime
         log.debug {
           "#{@name} running utime on " <<
           "#{@target.path}: #{@target.atime}/ #{@target.mtime}"
