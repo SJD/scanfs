@@ -1,6 +1,7 @@
 # -*- encoding: binary -*-
 
 require 'optparse'
+require 'thread'
 
 module ScanFS
 
@@ -19,7 +20,8 @@ module ScanFS
   @@options = {
     :reset_utimes => true,
     :clamp_min => Time.at(0),
-    :clamp_max => Time.now
+    :clamp_max => Time.now,
+    :proc_stats => false
   }
   @@target = Dir.pwd
   @@profiling = false
@@ -122,6 +124,10 @@ module ScanFS
       }
 
       opts.separator("\nProfiling")
+      process_stats_help = "Collect and report process stats"
+      opts.on( "--proc-stats", process_stats_help ) {
+        @@options[:proc_stats] = true
+      }
       ruby_prof_help = "Apply ruby-prof to scan"
       opts.on( "--ruby-profile", ruby_prof_help ) {
         begin
@@ -211,6 +217,10 @@ module ScanFS
       }
     end
 
+    ScanFS::Log.log.info {
+      "proc stats: #{((@@options[:proc_stats])?"enabled":"disabled")}"
+    }
+
     if @@options[:list_plugins]
       puts "Known plugins:"
       ScanFS::Plugins.known.each { |plugin_name|
@@ -258,7 +268,40 @@ module ScanFS
     end
   end
 
+  def self.start_proc_stats
+    if @@options[:proc_stats]
+      @@proc_stats = ScanFS::Utils::ProcessStats.new
+      @@proc_stats_fields = [
+        :vmrss,
+        :vmpeak,
+        :voluntary_ctxt_switches,
+        :nonvoluntary_ctxt_switches
+      ]
+      @@proc_stats_running = true
+      @@proc_poller = Thread.new {
+        while @@proc_stats_running
+          @@proc_stats.poll
+          stats = "Process stats:"
+          @@proc_stats.max_values.each_pair { |k, v|
+            stats << " #{k}(#{v})" if @@proc_stats_fields.include?(k)
+          }
+          ScanFS::Log.log.unknown { stats }
+          sleep 0.2
+        end
+      }
+    end
+  end
+
+  def self.stop_proc_stats
+    if @@options[:proc_stats]
+      @@proc_stats_running = false
+      @@proc_poller.join(1)
+    end
+  end
+
   def self.run()
+
+    ScanFS::start_proc_stats
 
     ScanFS::start_profiler
     scanner = ScanFS::Scanner.new(@@target, @@options)
@@ -270,6 +313,8 @@ module ScanFS
         ScanFS::Plugins.run(plugin_name, result, @@options)
       }
     end
+
+    ScanFS::stop_proc_stats
 
     output = ScanFS::Utils::BasicOutput.new(result, @@options)
     output.show

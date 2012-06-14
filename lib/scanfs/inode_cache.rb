@@ -8,7 +8,7 @@ module ScanFS::InodeCache
   @caches = []
   @cache_lock = Mutex.new
 
-  def self.init(num_caches=8, num_salts=8)
+  def self.init(num_caches=11, num_salts=7)
     @cache_lock.synchronize {
 
       @num_caches = num_caches.to_i
@@ -46,7 +46,7 @@ module ScanFS::InodeCache
     }
   end
 
-  def self.reset(num_caches=8, num_salts=8)
+  def self.reset(num_caches=11, num_salts=7)
     ScanFS::InodeCache.init(num_caches, num_salts)
   end
 

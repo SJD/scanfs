@@ -3,6 +3,7 @@
 require 'etc'
 require 'thread'
 require 'singleton'
+require 'monitor'
 
 module ScanFS::Utils
 
@@ -310,6 +311,70 @@ module ScanFS::Utils
     end
 
   end # class Directory
+
+
+  class ProcessStats
+    include ScanFS::Log
+
+    def initialize(pid=$$)
+      @pid = pid.to_i
+      @max_values = {}.extend(MonitorMixin)
+      if !File.exists?("/proc")
+        raise ScanFS::Error.new("proc filesystem not available!")
+      elsif !File.exists?("/proc/#{@pid}")
+        raise ScanFS::Error.new("no proc data for /proc/#{@pid}!")
+      elsif !File.readable?("/proc/#{@pid}")
+        raise ScanFS::Error.new("/proc/#{@pid} not readable!")
+      end
+    end
+
+    def read_stats
+      fields = {}
+      IO.readlines("/proc/#{@pid}/status").each { |line|
+        line.strip!
+        if line =~ /^(.+?):\s+(.+)$/
+          fields[$1.downcase.to_sym] = $2.sub(' kB', '')
+        end
+      }
+      log.debug { "proc stats for #{@pid}: #{fields.inspect}" }
+      fields
+    rescue => err
+      log.warn { "unable to open status from proc for #{@pid}: #{err}" }
+      fields
+    end; private :read_stats
+
+    def update_max_values(data)
+      @max_values.synchronize {
+        data.each_pair { |k, v|
+          if v.is_a?(Integer)
+            if data.has_key?(k)
+              @max_values[k] = v if nil == @max_values[k] || @max_values[k] < v
+            end
+          else
+              @max_values[k] = v
+          end
+        }
+      }
+    end; private :update_max_values
+
+    def max_values
+      @max_values.synchronize {
+        @max_values
+      }
+    end
+
+    def poll
+      data = read_stats
+      data.each_pair { |k, v|
+        if /^[0-9]*$/.match(v)
+          data[k] = v.to_i
+        end
+      }
+      update_max_values(data)
+      data
+    end
+
+  end # class ProcessStats
 
 
   class UIDResolver
