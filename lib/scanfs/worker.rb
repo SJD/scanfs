@@ -108,6 +108,7 @@ module ScanFS
           @inode_cache_misses += 1
         end
         log.debug { "#{@name} cache lookup #{stat.ino}: #{((seen)?"hit":"miss")}" }
+        seen
       else
         false
       end
