@@ -52,6 +52,11 @@ module ScanFS
       opts.on( "-f", "--filter FILTER", Array, filter_help ) { |filter_list|
         @@options[:filter] = filter_list
       }
+      setup_help = "Number of seconds to wait setting up the scan. Can help"+
+        " with slow automounters. Default: #{ScanFS::Scanner::DEFAULT_SETUP_TIMEOUT}"
+      opts.on( "--setup-timeout INT", Integer, setup_help ) { |n|
+        @@options[:setup_timeout] = n
+      }
 
       opts.separator("\nOutput")
       quiet_help = "Run quietly"

@@ -280,7 +280,7 @@ module ScanFS
       else
         raise ScanFS::Error.new("invalid scan target: #{target}")
       end
-      log.debug { "preparing scan target: #{target}" }
+      log.debug { "preparing scan target (timeout: #{@setup_timeout} seconds): #{target}" }
       @target = File.expand_path(target)
       if DEFAULT_TARGET == @target
         log.debug { "using default target: #{DEFAULT_TARGET}" }
